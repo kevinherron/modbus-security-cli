@@ -6,11 +6,14 @@ import com.digitalpetri.modbus.server.authz.AuthzHandler.AuthzResult
 import com.digitalpetri.modbus.server.authz.AuthzModbusServices
 import com.digitalpetri.modbus.server.authz.ReadWriteAuthzHandler
 import com.digitalpetri.modbus.tcp.server.NettyTcpServerTransport
+import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.ChannelInboundHandlerAdapter
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import java.security.KeyStore
 import java.util.*
+import java.util.function.Consumer
 
 
 fun main() {
@@ -54,6 +57,18 @@ object ModbusSecurityServer {
             cfg.tlsEnabled = true
             cfg.keyManagerFactory = serverKeyStore.toKeyManagerFactory()
             cfg.trustManagerFactory = authorityKeyStore.toTrustManagerFactory()
+
+            cfg.pipelineCustomizer = Consumer { pipeline ->
+                pipeline.addFirst(object : ChannelInboundHandlerAdapter() {
+                    override fun channelActive(ctx: ChannelHandlerContext) {
+                        LOGGER.info("Connection from: ${ctx.channel().remoteAddress()}")
+                    }
+
+                    override fun channelInactive(ctx: ChannelHandlerContext) {
+                        LOGGER.info("Connection closed: ${ctx.channel().remoteAddress()}")
+                    }
+                })
+            }
         }
 
         server = ModbusTcpServer.create(
@@ -86,7 +101,7 @@ object ModbusSecurityServer {
         private const val ROLE_READ_WRITE = "ReadWrite"
 
         override fun authorizeRead(unitId: Int, authzContext: AuthzContext): AuthzResult {
-            return authzContext.clientRole()
+            val result: AuthzResult = authzContext.clientRole()
                 .map { role ->
                     when (role) {
                         ROLE_READ_ONLY, ROLE_READ_WRITE -> AuthzResult.AUTHORIZED
@@ -94,10 +109,14 @@ object ModbusSecurityServer {
                     }
                 }
                 .orElse(AuthzResult.NOT_AUTHORIZED)
+
+            LOGGER.info("authorizeRead: role=${authzContext.clientRole()}, result=$result")
+
+            return result
         }
 
         override fun authorizeWrite(unitId: Int, authzContext: AuthzContext): AuthzResult {
-            return authzContext.clientRole()
+            val result: AuthzResult = authzContext.clientRole()
                 .map { role ->
                     when (role) {
                         ROLE_READ_WRITE -> AuthzResult.AUTHORIZED
@@ -105,6 +124,10 @@ object ModbusSecurityServer {
                     }
                 }
                 .orElse(AuthzResult.NOT_AUTHORIZED)
+
+            LOGGER.info("authorizeWrite: role=${authzContext.clientRole()}, result=$result")
+
+            return result
         }
 
     }
