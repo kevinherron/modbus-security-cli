@@ -13,6 +13,7 @@ import java.nio.file.Path
 import java.security.KeyStore
 import java.time.Duration
 import java.util.concurrent.CompletionStage
+import java.util.concurrent.LinkedBlockingQueue
 
 
 class StepfuncInteropTest {
@@ -71,6 +72,8 @@ class StepfuncInteropTest {
             ""
         )
 
+        val queue = LinkedBlockingQueue<ClientState>()
+
         val channel = ClientChannel.createTls(
             runtime,
             "localhost",
@@ -79,13 +82,12 @@ class StepfuncInteropTest {
             RetryStrategy(),
             tlsConfig,
             DecodeLevel.nothing(),
-            ConsoleClientStateListener()
+            TestClientStateListener(queue)
         )
 
         try {
             channel.enable()
-
-            Thread.sleep(1000)
+            awaitConnectedState(queue)
 
             assertDoesNotThrow {
                 val cs: CompletionStage<List<BitValue>> = channel.readCoils(
@@ -124,6 +126,8 @@ class StepfuncInteropTest {
             ""
         )
 
+        val queue = LinkedBlockingQueue<ClientState>()
+
         val channel = ClientChannel.createTls(
             runtime,
             "localhost",
@@ -132,13 +136,12 @@ class StepfuncInteropTest {
             RetryStrategy(),
             tlsConfig,
             DecodeLevel.nothing(),
-            ConsoleClientStateListener()
+            TestClientStateListener(queue)
         )
 
         try {
             channel.enable()
-
-            Thread.sleep(1000)
+            awaitConnectedState(queue)
 
             assertDoesNotThrow {
                 val cs: CompletionStage<List<BitValue>> = channel.readCoils(
@@ -166,11 +169,26 @@ class StepfuncInteropTest {
         }
     }
 
-    class ConsoleClientStateListener : ClientStateListener {
+    class TestClientStateListener(
+        private val queue: LinkedBlockingQueue<ClientState>
+    ) : ClientStateListener {
+
         override fun onChange(state: ClientState) {
             println("client state: $state")
+            queue.put(state)
         }
     }
 
+    private fun awaitConnectedState(queue: LinkedBlockingQueue<ClientState>) {
+        while (true) {
+            val state = queue.take()
+            if (state == ClientState.CONNECTED) {
+                break
+            }
+            if (state == ClientState.WAIT_AFTER_FAILED_CONNECT) {
+                throw Exception("failed to connect")
+            }
+        }
+    }
 
 }
