@@ -23,8 +23,8 @@ These are additionally available in OpenSSL friendly PEM formats:
 - `server.key`: the server private key in PKCS#8 (PEM) format.
 - `client1.crt`: the "ReadOnly" client certificate in PEM format.
 - `client1.key`: the "ReadOnly" client private key in PKCS#8 (PEM) format.
-- `client1.crt`: the "ReadWrite" client certificate in PEM format.
-- `client1.key`: the "ReadWrite" client private key in PKCS#8 (PEM) format.
+- `client2.crt`: the "ReadWrite" client certificate in PEM format.
+- `client2.key`: the "ReadWrite" client private key in PKCS#8 (PEM) format.
 
 You can mount this directory to a host volume at `/tmp/pki` to persist the certificates and keys.
 
