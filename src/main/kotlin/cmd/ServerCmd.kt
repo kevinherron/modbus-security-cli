@@ -1,3 +1,5 @@
+package cmd
+
 import com.digitalpetri.modbus.server.ModbusTcpServer
 import com.digitalpetri.modbus.server.ProcessImage
 import com.digitalpetri.modbus.server.ReadWriteModbusServices
@@ -6,41 +8,46 @@ import com.digitalpetri.modbus.server.authz.AuthzHandler.AuthzResult
 import com.digitalpetri.modbus.server.authz.AuthzModbusServices
 import com.digitalpetri.modbus.server.authz.ReadWriteAuthzHandler
 import com.digitalpetri.modbus.tcp.server.NettyTcpServerTransport
+import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
+import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.option
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import util.toKeyManagerFactory
+import util.toTrustManagerFactory
 import java.nio.file.Path
 import java.security.KeyStore
 import java.util.*
 import java.util.function.Consumer
+import kotlin.io.path.inputStream
 
 
-fun main() {
-    val authorityKeyStore: KeyStore =
-        createOrLoadKeyStore(Path.of("./pki/ca.pfx"), "ca") {
-            generateCaCertificate()
-        }
+class Server : CliktCommand() {
 
-    val serverKeyStore: KeyStore =
-        createOrLoadKeyStore(Path.of("./pki/server.pfx"), "server") {
-            val authorityKeys = authorityKeyStore.getKeys("ca")
-            generateCaSignedCertificate(authorityKeys, false)
-        }
+    val caKeyStore: String by option(
+        "--ca-key-store",
+        help = "The path to the CA KeyStore"
+    ).default("./pki/ca.pfx")
 
-    createOrLoadKeyStore(Path.of("./pki/client1.pfx"), "client1") {
-        val authorityKeys = authorityKeyStore.getKeys("ca")
-        generateCaSignedCertificate(authorityKeys, true, "ReadOnly")
+    val serverKeyStore: String by option(
+        "--server-key-store",
+        help = "The path to the Server KeyStore"
+    ).default("./pki/server.pfx")
+
+    override fun help(context: Context): String = "Start a Modbus Security server"
+
+    override fun run() {
+        ModbusSecurityServer.start(
+            Path.of(caKeyStore),
+            Path.of(serverKeyStore)
+        )
+
+        Thread.sleep(Long.MAX_VALUE)
     }
 
-    createOrLoadKeyStore(Path.of("./pki/client2.pfx"), "client2") {
-        val authorityKeys = authorityKeyStore.getKeys("ca")
-        generateCaSignedCertificate(authorityKeys, true, "ReadWrite")
-    }
-
-    ModbusSecurityServer.start(authorityKeyStore, serverKeyStore)
-
-    Thread.sleep(Long.MAX_VALUE)
 }
 
 object ModbusSecurityServer {
@@ -49,14 +56,26 @@ object ModbusSecurityServer {
 
     private lateinit var server: ModbusTcpServer
 
-    fun start(authorityKeyStore: KeyStore, serverKeyStore: KeyStore) {
+    fun start(authorityKeyStorePath: Path, serverKeyStorePath: Path) {
         val transport = NettyTcpServerTransport.create { cfg ->
             cfg.bindAddress = "0.0.0.0"
             cfg.port = 802
 
             cfg.tlsEnabled = true
-            cfg.keyManagerFactory = serverKeyStore.toKeyManagerFactory()
-            cfg.trustManagerFactory = authorityKeyStore.toTrustManagerFactory()
+
+            serverKeyStorePath.let {
+                val keyStore = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
+                    load(it.inputStream(), CharArray(0))
+                }
+                cfg.keyManagerFactory = keyStore.toKeyManagerFactory()
+            }
+
+            authorityKeyStorePath.let {
+                val keyStore = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
+                    load(it.inputStream(), CharArray(0))
+                }
+                cfg.trustManagerFactory = keyStore.toTrustManagerFactory()
+            }
 
             cfg.pipelineCustomizer = Consumer { pipeline ->
                 pipeline.addFirst(object : ChannelInboundHandlerAdapter() {

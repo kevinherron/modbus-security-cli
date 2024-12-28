@@ -8,7 +8,7 @@ group = "com.kevinherron.modbus"
 version = "1.0-SNAPSHOT"
 
 application {
-    mainClass = "ModbusSecurityServerKt"
+    mainClass = "ModbusKt"
 }
 
 repositories {
@@ -17,7 +17,8 @@ repositories {
 }
 
 dependencies {
-    implementation("com.digitalpetri.modbus:modbus-tcp:2.0.2-SNAPSHOT")
+    implementation("com.digitalpetri.modbus:modbus-tcp:2.1.0-SNAPSHOT")
+    implementation("com.github.ajalt.clikt:clikt:5.0.2")
     implementation("org.bouncycastle:bcprov-jdk18on:1.79")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.79")
     implementation("org.slf4j:slf4j-simple:2.0.16")

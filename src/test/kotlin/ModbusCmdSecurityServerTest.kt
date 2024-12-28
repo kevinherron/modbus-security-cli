@@ -1,14 +1,16 @@
+import cmd.ModbusSecurityServer
 import com.digitalpetri.modbus.client.ModbusTcpClient
 import com.digitalpetri.modbus.exceptions.ModbusException
 import com.digitalpetri.modbus.pdu.ReadCoilsRequest
 import com.digitalpetri.modbus.pdu.WriteSingleCoilRequest
 import com.digitalpetri.modbus.tcp.client.NettyTcpClientTransport
 import org.junit.jupiter.api.*
+import util.*
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.KeyStore
 
-class ModbusSecurityServerTest {
+class ModbusCmdSecurityServerTest {
 
     private val pkiPath: Path = Files.createTempDirectory("pki")
 
@@ -17,19 +19,21 @@ class ModbusSecurityServerTest {
             generateCaCertificate()
         }
 
-    private val serverKeyStore: KeyStore =
+    init {
+        pkiPath.toFile().deleteOnExit()
+
         createOrLoadKeyStore(pkiPath.resolve("server.pfx"), "server") {
             val authorityKeys = authorityKeyStore.getKeys("ca")
             generateCaSignedCertificate(authorityKeys, false)
         }
-
-    init {
-        pkiPath.toFile().deleteOnExit()
     }
 
     @BeforeEach
     fun setUp() {
-        ModbusSecurityServer.start(authorityKeyStore, serverKeyStore)
+        ModbusSecurityServer.start(
+            pkiPath.resolve("ca.pfx"),
+            pkiPath.resolve("server.pfx")
+        )
     }
 
     @AfterEach

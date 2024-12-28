@@ -1,8 +1,13 @@
+import cmd.ModbusSecurityServer
 import io.stepfunc.rodbus.*
 import io.stepfunc.rodbus.Nothing
 import org.joou.Unsigned.ubyte
 import org.joou.Unsigned.ushort
 import org.junit.jupiter.api.*
+import util.createOrLoadKeyStore
+import util.generateCaCertificate
+import util.generateCaSignedCertificate
+import util.getKeys
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.KeyStore
@@ -29,19 +34,21 @@ class StepfuncInteropTest {
             generateCaCertificate()
         }
 
-    private val serverKeyStore: KeyStore =
+    init {
+        pkiPath.toFile().deleteOnExit()
+
         createOrLoadKeyStore(pkiPath.resolve("server.pfx"), "server") {
             val authorityKeys = authorityKeyStore.getKeys("ca")
             generateCaSignedCertificate(authorityKeys, false)
         }
-
-    init {
-        pkiPath.toFile().deleteOnExit()
     }
 
     @BeforeEach
     fun setUp() {
-        ModbusSecurityServer.start(authorityKeyStore, serverKeyStore)
+        ModbusSecurityServer.start(
+            pkiPath.resolve("ca.pfx"),
+            pkiPath.resolve("server.pfx")
+        )
     }
 
     @AfterEach
