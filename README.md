@@ -4,7 +4,7 @@
 
 To build the Docker image, use the following command:
 
-```sh
+```shell
 docker build -t modbus-security-cli .
 ```
 
@@ -32,7 +32,7 @@ You can mount this directory to a host volume at `/tmp/pki` to persist the certi
 
 To run a container for the server command, use the following command:
 
-```sh
+```shell
 docker run --rm -it -v /tmp/pki:/app/pki modbus-security-cli:latest server
 ```
 
@@ -42,7 +42,7 @@ This command mounts the host directory `/tmp/pki` to the container's `/app/pki` 
 
 To run a container for the client command, use the following command:
 
-```sh
+```
 docker run --rm -it -v /tmp/pki:/app/pki modbus-security-cli:latest client <host> <command>
 ```
 
@@ -54,14 +54,18 @@ Replace `<host>` with the actual hostname or IP address of the server you want t
 
 ## Example Session
 Start a server:
+```shell
+docker run --rm -it -p 802:802 --name modbus-server -v /tmp/pki:/app/pki modbus-security-cli:latest server
 ```
-> docker run --rm -it -p 802:802 --name modbus-server -v /tmp/pki:/app/pki modbus-security-cli:latest server
+```
 [main] INFO ModbusSecurityServer - Modbus Security server listening on port 802
 ```
 
 In another terminal, connect to the server and read holding registers:
+```shell
+docker run --rm -it -v /tmp/pki:/app/pki modbus-security-cli:latest client host.docker.internal rhr 1 10
 ```
-> docker run --rm -it -v /tmp/pki:/app/pki modbus-security-cli:latest client host.docker.internal rhr 1 10
+```
 Connected to host.docker.internal:802
 -> ReadHoldingRegistersRequest[address=1, quantity=10]
 <- ReadHoldingRegistersResponse[registers=0000000000000000000000000000000000000000]
@@ -69,8 +73,10 @@ Disconnected
 ```
 
 Try to write a single register with the "ReadOnly" certificate:
+```shell
+docker run --rm -it -v /tmp/pki:/app/pki modbus-security-cli:latest client host.docker.internal wsr 1 42
 ```
-> docker run --rm -it -v /tmp/pki:/app/pki modbus-security-cli:latest client host.docker.internal wsr 1 42
+```
 Connected to host.docker.internal:802
 -> WriteSingleRegisterRequest[address=1, value=42]
 0x06 [WRITE_SINGLE_REGISTER] generated exception response 0x01 [ILLEGAL_FUNCTION]
@@ -78,8 +84,10 @@ Disconnected
 ```
 
 Write a single register with the "ReadWrite" certificate:
+```shell
+docker run --rm -it -v /tmp/pki:/app/pki modbus-security-cli:latest client --client-key-store=./pki/client2.pfx host.docker.internal wsr 1 42
 ```
-> docker run --rm -it -v /tmp/pki:/app/pki modbus-security-cli:latest client --client-key-store=./pki/client2.pfx host.docker.internal wsr 1 42
+```
 Connected to host.docker.internal:802
 -> WriteSingleRegisterRequest[address=1, value=42]
 <- WriteSingleRegisterResponse[address=1, value=42]
